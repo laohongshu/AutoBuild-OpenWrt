@@ -6,7 +6,8 @@
 # Youtube Channel: https://goo.gl/fvkdwm 
 #=================================================
 #1. Modify default IP
-sed -i 's/192.168.1.1/192.168.10.1/g' openwrt/package/base-files/files/bin/config_generate
+sed -i 's/192.168.1.1/10.10.10.10/g' openwrt/package/base-files/files/bin/config_generate
+sed -i 's/192.168/10.10/g' openwrt/package/base-files/files/bin/config_generate
 #2. 修改 TZ 时区
 echo "::notice ::设置openwrt默认时区为timezone=CST-8,时区区域名称为zonename=Asia/Shanghai"
 sed -i -e "s/set system.@system\[-1].hostname='OpenWrt'/set system.@system\[-1].hostname='OpenWrt'/g" -e "s/set system.@system\[-1].timezone='UTC'/set system.@system\[-1].timezone=\'CST-8\'/g" -e "/set system.@system\[-1].timezone='CST-8'/i\		set system.@system\[-1].zonename=\'Asia/Shanghai\'" openwrt/package/base-files/files/bin/config_generate
