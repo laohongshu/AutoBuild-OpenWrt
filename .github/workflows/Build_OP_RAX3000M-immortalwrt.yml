@@ -63,14 +63,16 @@ jobs:
         REPO_BRANCH: openwrt-24.10
       run: |
         git clone --depth 1 $REPO_URL -b $REPO_BRANCH openwrt
-        ls
+        ls openwrt
+        pwd
         ln -sf /workdir/openwrt $GITHUB_WORKSPACE/openwrt
 
     - name: Update & Install feeds
       run: |
         ls
-        cd openwrt && ./scripts/feeds update -a
-        cd openwrt && ./scripts/feeds install -a
+        cd openwrt
+        ./scripts/feeds update -a
+        ./scripts/feeds install -a
 
     - name: Configuration Customization - Build_RAX3000M
       env:
@@ -81,6 +83,7 @@ jobs:
 
     - name: Build firmware
       run: |
+        ls
         cd openwrt
         echo -e "$(nproc) thread compile"
         make -j$(nproc) || make -j1 || make -j1 V=s
