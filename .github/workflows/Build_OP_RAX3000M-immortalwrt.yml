@@ -127,7 +127,7 @@ jobs:
       uses: actions/upload-artifact@master
       if: ${{ steps.organize.outputs.status == 'success' && !cancelled() }}
       with:
-          name: OpenWrt_firmware${{ env.DEVICE_NAME }}${{ env.FILE_DATE }}
+          name: RAX3000M-immortalwrt-EMMC${{ env.DEVICE_NAME }}${{ env.FILE_DATE }}
           path: ${{ env.FIRMWARE }}
 
     - name: Generate release tag
