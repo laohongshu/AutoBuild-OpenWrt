@@ -136,10 +136,10 @@ jobs:
           echo "release_tag=$(date +"%Y.%m.%d_%H.%M.%S-Rax3000m")" >> $GITHUB_OUTPUT
           touch release.txt
           echo "### 📒 固件信息" >> release.txt
-          echo "Rax3000M 自用精简 openwrt：" >> release.txt
+          echo "Rax3000M-NAND 自用精简 openwrt：" >> release.txt
           echo "- 💻 平台架构: ${{ env.DEVICE_TARGET }}-${{ env.DEVICE_SUBTARGET }}" >> release.txt
           echo "- 🚀 内核版本: ${{ env.KERNEL }}" >> release.txt
-          echo "- 🌐 默认地址: 10.10.10.1" >> release.txt
+          echo "- 🌐 默认地址: 11.11.11.1" >> release.txt
           echo "- 👤 账号：root" >> release.txt
           echo "- 🔑 默认密码: 空 或者 password" >> release.txt
           echo "默认主题：Argon" >> release.txt
