@@ -5,7 +5,7 @@
 # Youtube Channel: https://goo.gl/fvkdwm 
 #=================================================
 
-name: Build_OP_RAX3000M-immortalwrt-EMMC
+name: Build_OP_RAX3000M-immortalwrt-EMMC-padavanonly
 
 # Add a button to trigger the workflow
 on: 
