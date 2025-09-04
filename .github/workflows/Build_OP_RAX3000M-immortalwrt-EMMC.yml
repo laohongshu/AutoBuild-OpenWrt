@@ -1,0 +1,172 @@
+#=================================================
+# Description: Build OpenWrt using GitHub Actions
+# Lisence: MIT
+# Author: eSirPlayground
+# Youtube Channel: https://goo.gl/fvkdwm 
+#=================================================
+
+name: Build_OP_RAX3000M-immortalwrt-EMMC
+
+# Add a button to trigger the workflow
+on: 
+#  schedule:
+#    - cron: '0 4 * * *'
+  repository_dispatch:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+
+    - name: Initialization environment
+      env:
+        DEBIAN_FRONTEND: noninteractive
+      run: |
+          set +e
+          docker rmi `docker images -q`
+          sudo rm -rf /etc/apt/sources.list.d/* /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+          sudo rm -rf \
+            /usr/share/dotnet \
+            /usr/local/lib/android \
+            /opt/ghc \
+            /etc/mysql \
+            /etc/php
+          sudo -E apt-get -y purge azure-cli* docker* ghc* zulu* hhvm* llvm* firefox* google* dotnet* aspnetcore* powershell* openjdk* adoptopenjdk* mysql* php* mongodb* moby* snap* || true
+          sudo apt-get update -y
+          sudo apt-get full-upgrade -y
+          sudo apt-get -y install $(curl -fsSL https://tinyurl.com/ubuntu2204-make-openwrt)
+          
+          sudo -E apt-get -qq autoremove --purge
+          sudo -E apt-get -qq clean
+          sudo timedatectl set-timezone "Asia/Shanghai"
+          sudo mkdir -p /workdir
+          sudo chown $USER:$GROUPS /workdir
+          
+    - name: 合并磁盘 Disks
+      uses: easimon/maximize-build-space@master
+      with:
+        swap-size-mb: 1024
+        temp-reserve-mb: 100
+        root-reserve-mb: 1024
+        
+    - name: 将github存储库签出到运行器
+      uses: actions/checkout@master
+
+    - name: build environment
+      run: |
+        sudo bash -c 'bash <(curl -s https://build-scripts.immortalwrt.org/init_build_environment.sh)'
+
+    - name: Clone source code
+      env: 
+        REPO_URL: https://github.com/immortalwrt/immortalwrt
+        REPO_BRANCH: openwrt-24.10
+      run: |
+        git clone --depth 1 $REPO_URL -b $REPO_BRANCH openwrt
+        ln -sf /workdir/openwrt $GITHUB_WORKSPACE/openwrt
+
+    - name: Update & Install feeds
+      run: |
+        cd openwrt
+        ./scripts/feeds update -a
+        ./scripts/feeds install -a
+
+    - name: Configuration Customization - Build_RAX3000M
+      env:
+        CONFIG_FILE: 'rax3000openwrt-immortalwrt-emmc.config'
+      run: |
+        [ -e $CONFIG_FILE ] && mv $CONFIG_FILE openwrt/.config
+        cd openwrt && make defconfig
+
+    - name: Build firmware
+      run: |
+        cd openwrt
+        echo -e "$(nproc) thread compile"
+        make -j$(nproc) || make -j1 || make -j1 V=s
+        echo "status=success" >> $GITHUB_OUTPUT
+        grep '^CONFIG_TARGET.*DEVICE.*=y' .config | sed -r 's/.*DEVICE_(.*)=y/\1/' > DEVICE_NAME
+        [ -s DEVICE_NAME ] && echo "DEVICE_NAME=_$(cat DEVICE_NAME)" >> $GITHUB_ENV
+        echo "FILE_DATE=_$(date +"%Y%m%d%H%M")" >> $GITHUB_ENV
+
+    - name : Upload artifact 固件上传
+      uses: actions/upload-artifact@master
+      with:
+        name: OpenWrt_固件
+        path: openwrt/bin/targets
+
+        #软件包分类
+    - name: Package Firmware 
+      run: |
+          #在openwrt目录下创建目录为upload目录名
+          cd ./openwrt && mkdir ./upload
+          rm -rf $(find ./ -iregex ".*\(json\|buildinfo\|sha256sums\|packages\)$")
+          cp -rf $(find ./bin/targets/ -type f -iname "*.*") ./upload/
+          cp -rf ./.config ./upload/Config_"Rax3000"_"openwrt源码"_"$FILE_DATE".txt
+          cd ./bin/targets/*/*
+          echo "KERNEL=$(cat *.manifest | grep ^kernel | cut -d- -f2 | tr -d ' ')" >> $GITHUB_ENV
+          rm -rf *.manifest
+          cd "$GITHUB_WORKSPACE/openwrt/upload"
+
+    - name: Organize files
+      id: organize
+      if: env.UPLOAD_FIRMWARE == 'true' && !cancelled()
+      run: |
+          cd
+          cd openwrt/bin/targets/*/*
+          rm -rf packages
+          rm -rf *.buildinfo
+          rm -rf sha256sums
+          rm -rf *.manifest
+          rm -rf *rootfs.img.gz
+          rm -rf *.json
+          rm -rf *.qcow2
+          echo "FIRMWARE=$PWD" >> $GITHUB_ENV
+          echo "status=success" >> $GITHUB_OUTPUT
+
+    - name: Upload firmware directory
+      uses: actions/upload-artifact@master
+      if: ${{ steps.organize.outputs.status == 'success' && !cancelled() }}
+      with:
+          name: RAX3000M-immortalwrt-EMMC${{ env.DEVICE_NAME }}${{ env.FILE_DATE }}
+          path: ${{ env.FIRMWARE }}
+
+    - name: Generate release tag
+      id: tag
+      run: |
+          echo "release_tag=$(date +"%Y.%m.%d_%H.%M.%S-Rax3000m")" >> $GITHUB_OUTPUT
+          touch release.txt
+          echo "### 📒 固件信息" >> release.txt
+          echo "Rax3000M-EMMC 自用精简 openwrt：" >> release.txt
+          echo "- 💻 平台架构: ${{ env.DEVICE_TARGET }}-${{ env.DEVICE_SUBTARGET }}" >> release.txt
+          echo "- 🚀 内核版本: ${{ env.KERNEL }}" >> release.txt
+          echo "- 🌐 默认地址: 10.10.10.1" >> release.txt
+          echo "- 👤 账号：root" >> release.txt
+          echo "- 🔑 默认密码: 空 或者 password" >> release.txt
+          echo "默认主题：Argon" >> release.txt
+          echo "status=success" >> $GITHUB_OUTPUT
+          
+          #上传固件以发布
+    - name: Upload firmware to release
+      uses: softprops/action-gh-release@master
+      env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+          tag_name: ${{ steps.tag.outputs.release_tag }}
+          body_path: release.txt
+          files: ./openwrt/upload/*.*
+
+
+    - name: Delete workflow runs
+      uses: GitRML/delete-workflow-runs@main
+      with:
+        retain_days: 1
+        keep_minimum_runs: 3
+ 
+    - name: Remove old Releases
+      uses: dev-drprasad/delete-older-releases@v0.1.0
+      with:
+          keep_latest: 3
+          delete_tags: true
+      env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
